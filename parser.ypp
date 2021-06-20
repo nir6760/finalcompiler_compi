@@ -1,0 +1,196 @@
+%{ /* Declarations section */
+	#include "helper.hpp"
+	#include "Comp.hpp"
+	#include "hw3_output.hpp"
+	
+	#include <iostream>
+	#include <stdlib.h>
+	#define YYDEBUG 1
+
+	using namespace std;
+	using namespace output;
+	extern int yylex();
+	extern int yylineno;
+	int yyerror(const char * message);
+	extern size_t yyleng;
+
+	static SymbolTable table; //save the symbol table with the hash
+	// static StackScopes stack_scope;
+	// static SymbolHash symbol_table_hash;
+
+    static Comp comp(table); //class for tranlation to llvm
+%}
+
+
+
+%right ASSIGN
+%left OR
+%left AND
+%left EQUALOP
+%right IF NOT
+%token VOID INT BYTE B BOOL TRUE FALSE RETURN WHILE BREAK CONTINUE SWITCH CASE DEFAULT COLON SC COMMA ID NUM STRING ENDOFFILE
+%nonassoc RELOP
+%left PLUS MINUS
+%left DIV MULT
+%left LPAREN RPAREN LBRACE RBRACE
+%nonassoc ELSE
+
+
+%%
+
+Program : Funcs ENDOFFILE{table.checkWasMain();}
+;
+Funcs :  FuncDecl Funcs{}
+		| {}
+;
+FuncDecl : RetType ID LPAREN Formals RPAREN LBRACE{
+	table.addFunc($2->str, $1->str, $4->params_type, $4->params_names );
+	$$ = comp.handle_func($1->str, $2->str, $4->params_type, $4->params_names);
+	} Statements RBRACE{table.closeScope(true);
+						
+						comp.end_func();}
+	
+;
+RetType :   Type{$$=new cut_type();$$->str = $1->str;}
+            |VOID {$$=new cut_type();$$->str = "VOID";}
+;
+Formals :   FormalList{$$=new cut_type();
+	$$->params_type = $1->params_type;
+	$$->params_names = $1->params_names;
+}
+			|/*epsilon*/{$$=new cut_type();
+				$$->params_type = {};
+				$$->params_names = {};}
+;
+FormalList : FormalDecl COMMA FormalList{$$=new cut_type();
+				$$->params_type = $1->params_type;
+				table.mergeVectors($$->params_type,$3->params_type );
+             	$$->params_names = $1->params_names;
+				table.mergeVectors($$->params_names,$3->params_names );}
+			|FormalDecl{$$=new cut_type();
+						$$->params_type = $1->params_type; 
+						$$->params_names = $1->params_names;}
+            
+;
+FormalDecl : Type ID{$$=new cut_type();
+					$$->params_names = {$2->str};
+					 $$->params_type = {$1->str};}
+;
+Statements :	Statements Statement{$$ = comp.handle_statments($1, $2);} 
+				|Statement{$$ = $1;}
+            
+;
+Statement : LBRACE{table.openScope(false,false);} Statements RBRACE{table.closeScope(true);}
+			|Type ID ASSIGN Exp SC{table.insertVarToSymbolTable($2->str, $1->str);
+								 table.checkValidTypes($1->str, $4->str);
+								 table.checkValidCast($1->str, $4->str);}
+            |Type ID SC{
+				table.insertVarToSymbolTable($2->str, $1->str);
+				$$ = comp.handle_decl($1, $2->str, nullptr);}
+            |ID ASSIGN Exp SC{
+				table.checkValidID($1->str);
+				$1->str = table.typeOfSym($1->str);
+				table.checkValidTypes($1->str, $3->str);}
+            |Call SC{}
+            |RETURN Exp SC{table.checkRetType($2->str);}
+			|RETURN SC{table.checkVoidRetType();}
+			|IF LPAREN MExp RPAREN MStatement
+			|IF LPAREN MExp RPAREN MStatement ELSE
+			{table.openScope(false,false);} Statement{table.closeScope(true);}
+            |WHILE LPAREN Exp{table.isBool($3->str);} RPAREN{table.openScope(true,false);} Statement{table.closeScope(true);}
+            |BREAK SC{table.checkUnexpected("BREAK");}
+            |CONTINUE SC{table.checkUnexpected("CONTINUE");}
+            |SWITCH LPAREN Exp{table.isIntByte($3->str);} RPAREN LBRACE{table.openScope(false,true);} CaseList RBRACE{table.closeScope(true);}
+;
+MExp : 	Exp{table.isBool($1->str);table.openScope(false,false);}
+;
+MStatement : 	Statement{table.closeScope(true);}
+;
+Call :  ID LPAREN ExpList RPAREN{	table.checkFuncDecl($1->str, $3->params_type);
+									$$=new cut_type();
+									$$->str = table.typeOfSym($1->str);}
+        |ID LPAREN RPAREN{	table.checkFuncDecl($1->str, vector<string>());
+							$$=new cut_type();
+							$$->str =table.typeOfSym($1->str); }
+;
+ExpList : 	Exp COMMA ExpList{$$=new cut_type();$$->params_type = {$1->str};
+							 table.mergeVectors($$->params_type,$3->params_type );}
+			|Exp{$$=new cut_type();$$->params_type = {$1->str};}
+        
+;
+Type : INT{$$ = new cut_type("INT");}
+        |BYTE{$$ = new cut_type("BYTE");}
+        |BOOL{$$ = new cut_type("BOOL");}
+;
+Exp : LPAREN Exp RPAREN{$$=new cut_type();$$->str = $2->str;}
+    |Exp MULT Exp{table.checkValidNumeric($1->str, $3->str);
+					$$=new cut_type();
+				  $$->str =table.findExpType($1->str, $3->str); }
+	|Exp DIV Exp{table.checkValidNumeric($1->str, $3->str);
+				$$=new cut_type();
+				  $$->str =table.findExpType($1->str, $3->str); }
+	|Exp MINUS Exp{table.checkValidNumeric($1->str, $3->str);
+				  $$=new cut_type();
+				  $$->str =table.findExpType($1->str, $3->str); }
+	|Exp PLUS Exp{table.checkValidNumeric($1->str, $3->str);
+				$$=new cut_type();
+				  $$->str =table.findExpType($1->str, $3->str); }
+    |ID{table.checkValidID($1->str);
+		$$=new cut_type();
+		$$->str = table.typeOfSym($1->str);}
+    |Call{$$=new cut_type();$$->str = $1->str;}
+	|NUM B{	table.checkOverFlowByte(atoi($1->str.c_str()));
+			$$=new cut_type();
+	 		$$->str = "BYTE";}
+    |NUM{$$=new cut_type();$$->str = "INT";}
+    |STRING{$$=new cut_type();$$->str = "STRING";}
+    |TRUE{$$=new cut_type();$$->str = "BOOL";}
+    |FALSE{$$=new cut_type();$$->str = "BOOL";}
+    |NOT Exp{table.isBool($2->str);
+			$$=new cut_type();
+			 $$->str = "BOOL";}
+    |Exp AND Exp{table.isBool($1->str);
+				table.isBool($3->str);
+				$$=new cut_type();
+				 $$->str = "BOOL";}
+    |Exp OR Exp{table.isBool($1->str);
+				table.isBool($3->str);
+				$$=new cut_type();
+				 $$->str = "BOOL";}
+    |Exp RELOP Exp{	table.checkValidNumeric($1->str, $3->str);
+					$$=new cut_type();
+					$$->str = "BOOL";}
+	|Exp EQUALOP Exp{table.checkValidNumeric($1->str, $3->str);
+					$$=new cut_type();
+					$$->str = "BOOL";}
+    //|LPAREN Type RPAREN Exp{}
+;
+CaseList :  CaseDeal CaseList{}
+            |CaseDeal{}
+            |DEFAULT COLON Statements{}
+;
+CaseDeal : CASE NUM COLON Statements{}
+;
+
+%%
+/* c code */
+
+
+int main()
+{
+	//yydebug = 1;
+	//InitPrintFunctions();
+	int fin = yyparse();
+	table.endComp();
+	CodeBuffer::instance().printGlobalBuffer();
+	CodeBuffer::instance().printCodeBuffer();
+	return fin;
+	
+}
+
+int yyerror(const char * message)
+{	
+	errorSyn(yylineno);
+	exit(1);
+}
+

@@ -1,0 +1,6 @@
+cp ./makefile .
+make
+
+./hw5 < t1.in > t1.llvm
+# lli ./t1.llvm > t1.res
+cat ./t1.llvm

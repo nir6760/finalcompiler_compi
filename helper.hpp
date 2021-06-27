@@ -36,8 +36,10 @@ class cut_type {
     vector<pair<int,BranchLabelIndex>> false_list;
     vector<pair<int,BranchLabelIndex>> next_list;
 
+
+
     vector<string> cases_labels_vec;
-    vector<string> cases_places_vec;
+    vector<string> cases_str_num_vec;
     
     cut_type(){}
     cut_type(string st):str(st){}

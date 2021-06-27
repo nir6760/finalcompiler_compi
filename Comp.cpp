@@ -201,6 +201,7 @@ cut_type* Comp::expBin(cut_type& r1, const string& op, cut_type& r2){
     if (property->label.empty()){
         property->label = my_label;
     } 
+    
     buffer.bpatch(r1.next_list, r2.label);
     buffer.bpatch(r2.next_list, my_label);
 
@@ -567,8 +568,6 @@ cut_type* Comp::handle_while(cut_type* exp, cut_type* statment, cut_type* curr_b
 
     if(curr_break_exp != nullptr)
         res->next_list = buffer.merge(curr_break_exp->next_list, exp->false_list);
-    else
-        res->next_list = buffer.merge(curr_break_exp->next_list, exp->false_list);
 
     buffer.bpatch(exp->true_list, statment->label);
     buffer.bpatch(statment->next_list, exp->label);
@@ -585,7 +584,7 @@ cut_type* Comp::handle_continue(cut_type* exp) {
     return res;
 }
 //handles break
-cut_type* Comp::handle_break(cut_type* exp) {
+cut_type* Comp::handle_break(cut_type* this_break) {
     
     cut_type* res = new cut_type();
     res->label = buffer.genLabel();
@@ -593,38 +592,52 @@ cut_type* Comp::handle_break(cut_type* exp) {
 
     int row_num = buffer.emit("br label @" ); //skip this part
 
-    res->next_list.push_back(make_pair(row_num, FIRST));
+    this_break->next_list.push_back(make_pair(row_num, FIRST));
 
     return res;
 }
 
 //handles specific Case
 cut_type* Comp::handle_casedeal(cut_type* num,cut_type* statem) {
+
+
+    
     cut_type* res = new cut_type();
+
+    
+
     res->label = statem->label;
-    res->place = num->place;
+    res->str = num->str; //his string number 
     res->next_list = statem->next_list;
     return res;
 }
 //handles one Case from caselist
 cut_type* Comp::handle_caselist_one(cut_type* this_case) {
     cut_type* res = new cut_type();
+
+
     res->cases_labels_vec.push_back(this_case->label);
-    res->cases_places_vec.push_back(this_case->place);
+    res->cases_str_num_vec.push_back(this_case->str);
 
-
+    res->next_list = this_case->next_list;
+    
     res->exist_default = this_case->exist_default;
     return res;
 }
 //handles caselist
 cut_type* Comp::handle_caselist(cut_type* this_case, cut_type* caselist) {
     cut_type* res = new cut_type();
+    if(!this_case->next_list.empty()){ //ther is no break in this case
+        buffer.bpatch(this_case->next_list, caselist->cases_labels_vec.back());
+    }
     res->cases_labels_vec = caselist->cases_labels_vec;
     res->cases_labels_vec.push_back(this_case->label);
     
-    res->cases_places_vec = caselist->cases_places_vec;
-    res->cases_places_vec.push_back(this_case->place);
+    res->cases_str_num_vec = caselist->cases_str_num_vec;
+    res->cases_str_num_vec.push_back(this_case->str);
 
+
+    
     res->next_list = buffer.merge(caselist->next_list, this_case->next_list);
 
     res->exist_default = this_case->exist_default || caselist->exist_default;
@@ -638,27 +651,27 @@ cut_type* Comp::handle_default_case(cut_type* def) {
     //res->cases_labels_vec = def->cases_labels_vec;
     res->cases_labels_vec.push_back(def->label);
     
-    //res->cases_places_vec = caselist->cases_places_vec;
-    res->cases_places_vec.push_back(def->place);
-
+    //res->cases_str_num_vec = caselist->cases_str_num_vec;
+    res->cases_str_num_vec.push_back(def->str);
+    res->next_list = def->next_list;
 
     res->exist_default = true;
     return res;
 }
 
 //handles default case
-cut_type* Comp::handle_switch(cut_type* exp, cut_type* caselist) {
+cut_type* Comp::handle_switch(cut_type* exp, cut_type* caselist, cut_type* switch_breaks) {
     cut_type* res = new cut_type();
-    string new_label =buffer.genLabel();
-    res->label = new_label;
     
+    res->label = exp->label;
+    string new_label =buffer.genLabel();
     buffer.bpatch(exp->next_list, new_label);
     
     int row_num;
     string new_case_label;
     int i =0;
-    buffer.emit("*********************** here" );
-    while(!caselist->cases_places_vec.empty()){
+    //cout<<caselist->next_list.size()<<"  ***********\n\n";
+    while(!caselist->cases_str_num_vec.empty()){
         
         if(i != 0){
             new_case_label =buffer.genLabel();
@@ -666,22 +679,24 @@ cut_type* Comp::handle_switch(cut_type* exp, cut_type* caselist) {
         }
         
         
-        string curr_val_place = caselist->cases_places_vec.back();
-        caselist->cases_places_vec.pop_back();
+        string curr_str_num = caselist->cases_str_num_vec.back();
+        caselist->cases_str_num_vec.pop_back();
 
         string curr_label_case = caselist->cases_labels_vec.back();
         caselist->cases_labels_vec.pop_back();
 
 
-        if (caselist->exist_default && caselist->cases_places_vec.size() == 1){
-            
+        if (caselist->exist_default && caselist->cases_str_num_vec.size() == 0){
+            // only for default
             row_num = buffer.emit("br label %" + curr_label_case );
             break; 
         }
+        string this_case_val_reg = generete_reg() + "_case_val_" + to_string(i);
+        buffer.emit(this_case_val_reg + " = add i32 " + curr_str_num + ", 0");
 
         string after_cmp = generete_reg() + "_case_" + to_string(i);
-        buffer.emit(after_cmp + " = icmp eq i32 " + exp->place + ", " + curr_val_place);
-        row_num = buffer.emit("br i1 " + after_cmp + ", label " + curr_label_case + ", label @");
+        buffer.emit(after_cmp + " = icmp eq i32 " + exp->place + ", " + this_case_val_reg);
+        row_num = buffer.emit("br i1 " + after_cmp + ", label %" + curr_label_case + ", label @");
        
         res->next_list.push_back(make_pair(row_num, SECOND));
         i++;
@@ -695,7 +710,13 @@ cut_type* Comp::handle_switch(cut_type* exp, cut_type* caselist) {
     buffer.bpatch(res->next_list, end_label);
     row_num = buffer.emit("br label @" ); 
     res->next_list.push_back(make_pair(row_num, FIRST));
-    res->next_list = buffer.merge(caselist->next_list, res->next_list);
+
+    res->next_list = buffer.merge(switch_breaks->next_list, res->next_list);
+
+    if(!caselist->next_list.empty()){ //ther is no break in this case
+        res->next_list = buffer.merge(caselist->next_list, res->next_list);
+    }
+    //res->next_list = buffer.merge(caselist->next_list, res->next_list);
     
     return res;
 }

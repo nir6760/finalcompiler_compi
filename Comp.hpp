@@ -47,12 +47,12 @@ class Comp {
 
     cut_type* handle_while(cut_type* exp, cut_type* statment, cut_type* curr_break_exp);
     cut_type* handle_continue(cut_type* exp);
-    cut_type* handle_break(cut_type* exp);
+    cut_type* handle_break(cut_type* this_break);
     cut_type* handle_casedeal(cut_type* num,cut_type* statem);
     cut_type* handle_caselist_one(cut_type* this_case);
     cut_type* handle_caselist(cut_type* this_case, cut_type* caselist);
     cut_type* handle_default_case(cut_type* def);
-    cut_type* handle_switch(cut_type* exp, cut_type* caselist);
+    cut_type* handle_switch(cut_type* exp, cut_type* caselist, cut_type* switch_breaks);
 
     // props * handleWhile(props* exp, props* statement, vector<pair<int,BranchLabelIndex>>& next_list);
     // props * handleContinue(props* exp);

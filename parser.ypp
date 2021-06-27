@@ -161,9 +161,10 @@ Statement : LBRACE OPENTHIS Statements RBRACE CLOSETHIS {$$=$3;}
 				}
 
             |SWITCH LPAREN SwitchExp RPAREN LBRACE SwitchOpen CaseList RBRACE{
-				nested_break.pop_back();
+				
 				table.closeScope(true);
-				$$ = comp.handle_switch($3, $7);
+				$$ = comp.handle_switch($3, $7, nested_break.back());
+				nested_break.pop_back();
 			}
 ;
 
@@ -315,22 +316,13 @@ CaseList :  CaseDeal CaseList{
 			$$ = comp.handle_caselist_one($1);}
             |DEFAULT COLON Statements{$$ = comp.handle_default_case($3); }
 ;
-CaseDeal : CASE NUMCASE COLON Statements{
+CaseDeal : CASE NUM COLON Statements{
 	
 	$$ = comp.handle_casedeal($2, $4);
 	
 	}
 ;
-NUMCASE : NUM{
-	
-		/*compilation Num + 0*/
-	
-		cut_type t_num = cut_type("INT",$1->str);
-		cut_type t0 = cut_type("INT","0");
-		$$ = comp.expBin(t_num, "add", t0);
-		
-		$$->str = "INT";		
-}
+
 
 %%
 /* c code */

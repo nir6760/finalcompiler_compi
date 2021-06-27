@@ -16,66 +16,98 @@ define void @print(i8*) {
 define void @fallthrough(i32) {
 %reg_1 = add i32 50, 0
 %reg_0_currStackAdd = alloca i32, i32 %reg_1
-br label %label_42
+br label %label_6
 label_6:
 br label %label_42
 label_8:
 %reg_2 = add i32 1, 0
-br label @
+br label %label_13
 label_11:
-%reg_3 = add i32 10, 0
+br label %label_8
+label_13:
+call void @printi ( i32 %reg_2 )
 br label %label_16
-label_14:
-br label %label_11
 label_16:
-call void @printi ( i32 %reg_3 )
-br label %label_19
-label_19:
-br label %label_50
+br label %label_58
+label_18:
+%reg_3 = add i32 2, 0
+br label %label_23
 label_21:
-%reg_4 = add i32 2, 0
-br label @
-label_24:
-%reg_5 = add i32 20, 0
+br label %label_18
+label_23:
+call void @printi ( i32 %reg_3 )
 br label %label_29
-label_27:
-br label %label_24
+label_26:
+%reg_4 = add i32 3, 0
+br label %label_31
 label_29:
-call void @printi ( i32 %reg_5 )
-br label %label_32
-label_32:
-br label %label_50
+br label %label_26
+label_31:
+call void @printi ( i32 %reg_4 )
+br label %label_37
 label_34:
-%reg_6 = add i32 40, 0
+%reg_5 = add i32 0, 0
 br label %label_39
 label_37:
 br label %label_34
 label_39:
-call void @printi ( i32 %reg_6 )
-br label @
+call void @printi ( i32 %reg_5 )
+br label %label_58
 label_42:
-*********************** here
-%reg_7_case_0 = icmp eq i32 %0, %reg_2
-br i1 %reg_7_case_0, label label_14, label %label_46
+%reg_6_case_val_0 = add i32 1, 0
+%reg_7_case_0 = icmp eq i32 %0, %reg_6_case_val_0
+br i1 %reg_7_case_0, label %label_11, label %label_46
 label_46:
-br label %label_27
-label_48:
-br label %label_50
+%reg_8_case_val_1 = add i32 2, 0
+%reg_9_case_1 = icmp eq i32 %0, %reg_8_case_val_1
+br i1 %reg_9_case_1, label %label_21, label %label_50
 label_50:
+%reg_10_case_val_2 = add i32 3, 0
+%reg_11_case_2 = icmp eq i32 %0, %reg_10_case_val_2
+br i1 %reg_11_case_2, label %label_29, label %label_54
+label_54:
+br label %label_37
+label_56:
+br label %label_58
+label_58:
 ret void
 }
 define void @main() {
-%reg_9 = add i32 50, 0
-%reg_8_currStackAdd = alloca i32, i32 %reg_9
-br label %label_60
-label_57:
-%reg_10 = add i32 1, 0
-br label %label_62
-label_60:
-br label %label_57
-label_62:
-call void @fallthrough ( i32 %reg_10 )
-br label %label_65
+%reg_13 = add i32 50, 0
+%reg_12_currStackAdd = alloca i32, i32 %reg_13
+br label %label_68
 label_65:
+%reg_14 = add i32 1, 0
+br label %label_70
+label_68:
+br label %label_65
+label_70:
+call void @fallthrough ( i32 %reg_14 )
+br label %label_76
+label_73:
+%reg_15 = add i32 2, 0
+br label %label_78
+label_76:
+br label %label_73
+label_78:
+call void @fallthrough ( i32 %reg_15 )
+br label %label_84
+label_81:
+%reg_16 = add i32 3, 0
+br label %label_86
+label_84:
+br label %label_81
+label_86:
+call void @fallthrough ( i32 %reg_16 )
+br label %label_92
+label_89:
+%reg_17 = add i32 4, 0
+br label %label_94
+label_92:
+br label %label_89
+label_94:
+call void @fallthrough ( i32 %reg_17 )
+br label %label_97
+label_97:
 ret void
 }

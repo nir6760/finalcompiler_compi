@@ -907,14 +907,14 @@ case 3:
 YY_RULE_SETUP
 #line 37 "scanner.lex"
 {
-							/*ylval= new cut_type{"INT"}; */
+							yylval= new cut_type{"INT"}; 
 							return INT;}
 	YY_BREAK
 case 4:
 YY_RULE_SETUP
 #line 40 "scanner.lex"
 {
-							/*yylval= new cut_type{"BYTE"}; */
+							yylval= new cut_type{"BYTE"}; 
 							return BYTE;}
 	YY_BREAK
 case 5:
@@ -928,7 +928,7 @@ case 6:
 YY_RULE_SETUP
 #line 46 "scanner.lex"
 {
-							/*yylval= new cut_type{"BOOL"};*/ 
+							yylval= new cut_type{"BOOL"}; 
 							return BOOL;}
 	YY_BREAK
 case 7:
@@ -956,14 +956,14 @@ case 10:
 YY_RULE_SETUP
 #line 58 "scanner.lex"
 {
-							yylval= new cut_type{"True"};
+							yylval= new cut_type{"BOOL"};
 							return TRUE;}
 	YY_BREAK
 case 11:
 YY_RULE_SETUP
 #line 61 "scanner.lex"
 {
-							yylval= new cut_type{"FALSE"};
+							yylval= new cut_type{"BOOL"};
 							return FALSE;}
 	YY_BREAK
 case 12:

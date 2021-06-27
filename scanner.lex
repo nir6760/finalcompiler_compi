@@ -35,16 +35,16 @@ void                        {
 							yylval= new cut_type{"VOID"};
 							return VOID;}
 int                        {
-							/*ylval= new cut_type{"INT"}; */
+							yylval= new cut_type{"INT"}; 
 							return INT;}
 byte                        {
-							/*yylval= new cut_type{"BYTE"}; */
+							yylval= new cut_type{"BYTE"}; 
 							return BYTE;}
 b                        {
 							yylval= new cut_type{"BYTE"}; 
 							return B;}
 bool                        {
-							/*yylval= new cut_type{"BOOL"};*/ 
+							yylval= new cut_type{"BOOL"}; 
 							return BOOL;}
 and                        {
 							yylval= new cut_type{"AND"};
@@ -56,10 +56,10 @@ not                        {
 							yylval= new cut_type{"NOT"};			
 							return NOT;}
 true                        {
-							yylval= new cut_type{"True"};
+							yylval= new cut_type{"BOOL"};
 							return TRUE;}
 false                     {
-							yylval= new cut_type{"FALSE"};
+							yylval= new cut_type{"BOOL"};
 							return FALSE;}
 return                        {
 								yylval= new cut_type{yytext};
@@ -119,7 +119,7 @@ default                     {
 [1-9]+{digit}* {	
 					yylval= new cut_type{yytext};
 					return NUM;}
-\"([^\n\r\"\\]|\\[rnt"\\])+\" 	{	
+\"([^\n\r\"\\]|\\[rnt"\\])+\"	{	
 									yylval= new cut_type{yytext}; 
 									return STRING;}
 .		{

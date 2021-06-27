@@ -24,28 +24,31 @@ class cut_type {
     public:
     string str;
     string place;
-    string place_address;
     string label;
 
-    // string type;
-    // string ret_type;
-    // string name;
+    bool exist_default =false;
+
+
     vector<string> params_type;    /* type of params          */
     vector<string> params_names;    /* type of params          */
 
     vector<pair<int,BranchLabelIndex>> true_list;
     vector<pair<int,BranchLabelIndex>> false_list;
     vector<pair<int,BranchLabelIndex>> next_list;
+
+    vector<string> cases_labels_vec;
+    vector<string> cases_places_vec;
     
     cut_type(){}
     cut_type(string st):str(st){}
+    cut_type(string st,  string pla):str(st),place(pla){} // only for expressions
 };
 
 #define YYSTYPE cut_type* /* tells bison to use YYSTYPE as cut_type*         */
 class SymbolTable{
     public:
     SymbolTable();
-    ~SymbolTable();
+    //~SymbolTable();
     void InitPrintFunctions();
     void openScope(bool isWhile, bool isSwitch);
     void closeScope(bool print);
@@ -81,6 +84,7 @@ class SymbolTable{
     {
         public:
         bool is_function;
+        bool is_ret = false;
         string name;    /* name of symbol          */
         string type;    /* type of symbol          */
         vector<string> params_type;    /* type of params          */
@@ -99,7 +103,7 @@ class SymbolTable{
         stype(bool is_func,const string& n, const string& t,const vector<string>& p_type,const vector<string>& p_names,  int of ):
         is_function(is_func), name(n), type(t), params_type(p_type), params_names(p_names),  offset(of) {}//for function
         
-        void editStype(bool is_func,const string& n, const string& t,const vector<string>& p_type,const vector<string>& p_names,  int of );//edit stype for function
+       // void editStype(bool is_func,const string& n, const string& t,const vector<string>& p_type,const vector<string>& p_names,  int of );//edit stype for function
     };
 
 
@@ -119,16 +123,21 @@ class SymbolTable{
     void setRegSave(const string& id, int new_num);
     int getRegSave(const string& id);
     stype* getStype(const string& id);
+    string getParamAddPlace(const string& id, int& how_it_saved);
     int getParamOffset(const string& id);
+    string getVarType(const string& id);
+    string getFuncType(const string& id);
+
     stype* this_func; //save the current function
+    
 
     private:
 
     typedef vector<inside_scope> StackScopes;
-    typedef unordered_map<string, stype*> SymbolHash;
+    //typedef unordered_map<string, stype*> SymbolHash;
 
     StackScopes stack_scope; //stack of scopes
-    SymbolHash symbol_table_hash; // map for symbol table
+    //SymbolHash symbol_table_hash; // map for symbol table, should not be used
 };
 
 

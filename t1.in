@@ -1,6 +1,12 @@
-void main()
-{
-    int x;
-    int y;
-    int z;
+void fallthrough(int x) {
+    switch (x) {
+            case 1: printi(10); break;
+            case 2: printi(20); break;
+            default: printi(40);
+    }
+}
+
+
+void main() {
+	fallthrough(1);
 }

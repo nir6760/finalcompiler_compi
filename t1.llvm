@@ -13,13 +13,69 @@ define void @print(i8*) {
   call i32 (i8*, ...) @printf(i8* %spec_ptr, i8* %0)
   ret void
 }
-define void @main() {
+define void @fallthrough(i32) {
 %reg_1 = add i32 50, 0
-%reg_0 = alloca i32, i32 %reg_1
-%reg_2 = getelementptr i32, i32* %reg_0, i32 0
-store i32 0, i32* %reg_2
-%reg_3 = getelementptr i32, i32* %reg_0, i32 1
-store i32 0, i32* %reg_3
-%reg_4 = getelementptr i32, i32* %reg_0, i32 2
-store i32 0, i32* %reg_4
+%reg_0_currStackAdd = alloca i32, i32 %reg_1
+br label %label_42
+label_6:
+br label %label_42
+label_8:
+%reg_2 = add i32 1, 0
+br label @
+label_11:
+%reg_3 = add i32 10, 0
+br label %label_16
+label_14:
+br label %label_11
+label_16:
+call void @printi ( i32 %reg_3 )
+br label %label_19
+label_19:
+br label %label_50
+label_21:
+%reg_4 = add i32 2, 0
+br label @
+label_24:
+%reg_5 = add i32 20, 0
+br label %label_29
+label_27:
+br label %label_24
+label_29:
+call void @printi ( i32 %reg_5 )
+br label %label_32
+label_32:
+br label %label_50
+label_34:
+%reg_6 = add i32 40, 0
+br label %label_39
+label_37:
+br label %label_34
+label_39:
+call void @printi ( i32 %reg_6 )
+br label @
+label_42:
+*********************** here
+%reg_7_case_0 = icmp eq i32 %0, %reg_2
+br i1 %reg_7_case_0, label label_14, label %label_46
+label_46:
+br label %label_27
+label_48:
+br label %label_50
+label_50:
+ret void
+}
+define void @main() {
+%reg_9 = add i32 50, 0
+%reg_8_currStackAdd = alloca i32, i32 %reg_9
+br label %label_60
+label_57:
+%reg_10 = add i32 1, 0
+br label %label_62
+label_60:
+br label %label_57
+label_62:
+call void @fallthrough ( i32 %reg_10 )
+br label %label_65
+label_65:
+ret void
 }

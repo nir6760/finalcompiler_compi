@@ -3,9 +3,12 @@
 	#include "Comp.hpp"
 	#include "hw3_output.hpp"
 	
+	
 	#include <iostream>
 	#include <stdlib.h>
 	#define YYDEBUG 1
+
+	#include <tuple>
 
 	using namespace std;
 	using namespace output;
@@ -19,6 +22,13 @@
 	// static SymbolHash symbol_table_hash;
 
     static Comp comp(table); //class for tranlation to llvm
+
+	static vector<cut_type*> curr_call_exps;
+	static vector<cut_type*> nested_while;
+	static vector<cut_type*> nested_switch;
+	static vector<cut_type*> nested_break;
+
+
 %}
 
 
@@ -43,13 +53,19 @@ Program : Funcs ENDOFFILE{table.checkWasMain();}
 Funcs :  FuncDecl Funcs{}
 		| {}
 ;
-FuncDecl : RetType ID LPAREN Formals RPAREN LBRACE{
+FuncDecl : FuncDeclBegin Statements RBRACE{
+	
+						table.closeScope(true);
+						/*comp.handle_one_statment($2); */
+						comp.end_func($1 ,$2);
+						
+						}
+;
+FuncDeclBegin : RetType ID LPAREN Formals RPAREN LBRACE{
 	table.addFunc($2->str, $1->str, $4->params_type, $4->params_names );
 	$$ = comp.handle_func($1->str, $2->str, $4->params_type, $4->params_names);
-	} Statements RBRACE{table.closeScope(true);
-						
-						comp.end_func();}
-	
+	}
+
 ;
 RetType :   Type{$$=new cut_type();$$->str = $1->str;}
             |VOID {$$=new cut_type();$$->str = "VOID";}
@@ -76,101 +92,247 @@ FormalDecl : Type ID{$$=new cut_type();
 					$$->params_names = {$2->str};
 					 $$->params_type = {$1->str};}
 ;
-Statements :	Statements Statement{$$ = comp.handle_statments($1, $2);} 
-				|Statement{$$ = $1;}
+Statements :	Statements Statement{
+	
+				$$ = comp.handle_statments($1, $2);} 
+				|Statement{
+					$$ = $1;
+					}
+					/*	comp.handle_one_statment($1);}	*/
             
 ;
-Statement : LBRACE{table.openScope(false,false);} Statements RBRACE{table.closeScope(true);}
-			|Type ID ASSIGN Exp SC{table.insertVarToSymbolTable($2->str, $1->str);
+Statement : LBRACE OPENTHIS Statements RBRACE CLOSETHIS {$$=$3;}
+			|Type ID ASSIGN Exp SC{
+								 table.insertVarToSymbolTable($2->str, $1->str);
 								 table.checkValidTypes($1->str, $4->str);
-								 table.checkValidCast($1->str, $4->str);}
+								 table.checkValidCast($1->str, $4->str);
+								 $$ = comp.handle_decl($1, $2->str, $4);
+								 }
             |Type ID SC{
 				table.insertVarToSymbolTable($2->str, $1->str);
 				$$ = comp.handle_decl($1, $2->str, nullptr);}
             |ID ASSIGN Exp SC{
+				
 				table.checkValidID($1->str);
+				 
+				string id_name = $1->str;
+				
 				$1->str = table.typeOfSym($1->str);
-				table.checkValidTypes($1->str, $3->str);}
-            |Call SC{}
-            |RETURN Exp SC{table.checkRetType($2->str);}
-			|RETURN SC{table.checkVoidRetType();}
-			|IF LPAREN MExp RPAREN MStatement
-			|IF LPAREN MExp RPAREN MStatement ELSE
-			{table.openScope(false,false);} Statement{table.closeScope(true);}
-            |WHILE LPAREN Exp{table.isBool($3->str);} RPAREN{table.openScope(true,false);} Statement{table.closeScope(true);}
-            |BREAK SC{table.checkUnexpected("BREAK");}
-            |CONTINUE SC{table.checkUnexpected("CONTINUE");}
-            |SWITCH LPAREN Exp{table.isIntByte($3->str);} RPAREN LBRACE{table.openScope(false,true);} CaseList RBRACE{table.closeScope(true);}
+				
+			
+				
+				table.checkValidTypes($1->str, $3->str);
+				$$ = comp.handle_ass(id_name, $3);
+				}
+            |Call SC{$$=$1;}
+            |RETURN Exp SC{table.checkRetType($2->str);
+							$$ = comp.handle_return($2);
+							}
+			|RETURN SC{table.checkVoidRetType();
+						$$ = comp.handle_return(nullptr);
+						}
+
+			|IF LPAREN MExp RPAREN MStatement{
+
+				$$ = comp.handle_only_if($3, $5);
+				}
+			|IF LPAREN MExp RPAREN MStatement ELSE OPENTHIS Statement
+						{
+						table.closeScope(true);
+						$$ = comp.handle_if_else($3, $5,$8);
+						}
+            |WHILE LPAREN WHILECHECKEXP RPAREN WHILEOPENSCOPE Statement{
+				table.closeScope(true);
+				
+				$$ = comp.handle_while($3, $6, nested_break.back());
+				nested_while.pop_back();
+				nested_break.pop_back();
+				}
+            |BREAK SC{
+				
+				table.checkUnexpected("BREAK");
+				
+				$$ = comp.handle_break(nested_break.back());
+				
+			}
+            |CONTINUE SC{
+				table.checkUnexpected("CONTINUE");
+				$$ = comp.handle_continue(nested_while.back());
+				}
+
+            |SWITCH LPAREN SwitchExp RPAREN LBRACE SwitchOpen CaseList RBRACE{
+				nested_break.pop_back();
+				table.closeScope(true);
+				$$ = comp.handle_switch($3, $7);
+			}
 ;
-MExp : 	Exp{table.isBool($1->str);table.openScope(false,false);}
+
+SwitchExp	:	Exp{
+	table.isIntByte($1->str); 
+	$$=$1;
+	nested_break.push_back(new cut_type());
+}
 ;
-MStatement : 	Statement{table.closeScope(true);}
+SwitchOpen :	{table.openScope(false,true);}
 ;
-Call :  ID LPAREN ExpList RPAREN{	table.checkFuncDecl($1->str, $3->params_type);
+OPENTHIS	:	{table.openScope(false,false);}
+;
+CLOSETHIS	:	{table.closeScope(true);}
+;
+WHILECHECKEXP	:	Exp{
+		table.isBool($1->str);
+		nested_while.push_back($1);
+		nested_break.push_back(new cut_type());
+		$$ = $1;
+		}
+;
+WHILEOPENSCOPE	:	{table.openScope(true,false);}
+;
+MExp : 	Exp{table.isBool($1->str);table.openScope(false,false);
+			$$ = $1;}
+;
+MStatement : 	Statement{table.closeScope(true);
+						$$=$1;}
+;
+Call :  ID LPAREN ExpList RPAREN{
+									
+									table.checkFuncDecl($1->str, $3->params_names);
+									
 									$$=new cut_type();
-									$$->str = table.typeOfSym($1->str);}
+									$$->str = table.typeOfSym($1->str);
+									$$ = comp.handle_call($1->str, curr_call_exps);
+
+									curr_call_exps={};
+									}
         |ID LPAREN RPAREN{	table.checkFuncDecl($1->str, vector<string>());
 							$$=new cut_type();
-							$$->str =table.typeOfSym($1->str); }
+							$$->str =table.typeOfSym($1->str);
+							$$ = comp.handle_call($1->str, curr_call_exps);
+							curr_call_exps = {};
+							 }
 ;
-ExpList : 	Exp COMMA ExpList{$$=new cut_type();$$->params_type = {$1->str};
-							 table.mergeVectors($$->params_type,$3->params_type );}
-			|Exp{$$=new cut_type();$$->params_type = {$1->str};}
+ExpList : 	Exp COMMA ExpList{
+							$$=new cut_type();$$->params_names = {$1->str};
+							 table.mergeVectors($$->params_names,$3->params_names );
+							 curr_call_exps.push_back($1);
+							 
+    								
+							 }
+			|Exp{
+			$$=new cut_type();
+			$$->params_names = {$1->str};
+
+			curr_call_exps.push_back($1);
+			}
         
 ;
-Type : INT{$$ = new cut_type("INT");}
-        |BYTE{$$ = new cut_type("BYTE");}
-        |BOOL{$$ = new cut_type("BOOL");}
+Type : INT{$$ = $1;}
+        |BYTE{$$ = $1;}
+        |BOOL{$$ = $1;}
 ;
-Exp : LPAREN Exp RPAREN{$$=new cut_type();$$->str = $2->str;}
+Exp : LPAREN Exp RPAREN{$$ = $2; 
+					/*only cast from byte to int allowed*/}
     |Exp MULT Exp{table.checkValidNumeric($1->str, $3->str);
 					$$=new cut_type();
-				  $$->str =table.findExpType($1->str, $3->str); }
+				  $$->str =table.findExpType($1->str, $3->str);
+				  $$ = comp.expBin(*$1, "mul", *$3); }
 	|Exp DIV Exp{table.checkValidNumeric($1->str, $3->str);
 				$$=new cut_type();
-				  $$->str =table.findExpType($1->str, $3->str); }
+				  $$->str =table.findExpType($1->str, $3->str);
+				  $$ = comp.expBin(*$1, "sdiv", *$3); }
 	|Exp MINUS Exp{table.checkValidNumeric($1->str, $3->str);
 				  $$=new cut_type();
-				  $$->str =table.findExpType($1->str, $3->str); }
+				  $$->str =table.findExpType($1->str, $3->str);
+				  $$ = comp.expBin(*$1, "sub", *$3);
+				  }
 	|Exp PLUS Exp{table.checkValidNumeric($1->str, $3->str);
 				$$=new cut_type();
-				  $$->str =table.findExpType($1->str, $3->str); }
+				  $$->str =table.findExpType($1->str, $3->str);
+				  $$ = comp.expBin(*$1, "add", *$3); }
+
     |ID{table.checkValidID($1->str);
 		$$=new cut_type();
-		$$->str = table.typeOfSym($1->str);}
-    |Call{$$=new cut_type();$$->str = $1->str;}
-	|NUM B{	table.checkOverFlowByte(atoi($1->str.c_str()));
-			$$=new cut_type();
-	 		$$->str = "BYTE";}
-    |NUM{$$=new cut_type();$$->str = "INT";}
-    |STRING{$$=new cut_type();$$->str = "STRING";}
-    |TRUE{$$=new cut_type();$$->str = "BOOL";}
-    |FALSE{$$=new cut_type();$$->str = "BOOL";}
+		$$->str = table.typeOfSym($1->str);
+		
+		$$ = comp.handle_id($1);
+
+		}
+    |Call{$$ = $1;}
+	|NUM B{
+			table.checkOverFlowByte(atoi($1->str.c_str()));
+	 		
+
+			/*compilation NumB + 0*/
+			cut_type t_num = cut_type("BYTE",$1->str);
+			cut_type t0 = cut_type("BYTE","0");
+			$$ = comp.expBin(t_num, "add", t0);
+			$$->str = "BYTE";
+			}
+    |NUM{
+		
+		/*compilation Num + 0*/
+		
+		cut_type t_num = cut_type("INT",$1->str);
+		cut_type t0 = cut_type("INT","0");
+		$$ = comp.expBin(t_num, "add", t0);
+		$$->str = "INT";
+		
+
+	}
+    |STRING{
+	$$ = comp.handle_str($1->str);
+	}
+    |TRUE{$$ = comp.bool_val(1);}
+    |FALSE{$$ = comp.bool_val(0);}
     |NOT Exp{table.isBool($2->str);
-			$$=new cut_type();
-			 $$->str = "BOOL";}
+			 $$ = comp.handle_not($2);
+			 }
+
     |Exp AND Exp{table.isBool($1->str);
 				table.isBool($3->str);
-				$$=new cut_type();
-				 $$->str = "BOOL";}
+				$$ = comp.handle_and($1, $3);
+				}
     |Exp OR Exp{table.isBool($1->str);
 				table.isBool($3->str);
-				$$=new cut_type();
-				 $$->str = "BOOL";}
+				$$ = comp.handle_or($1, $3);
+				}
     |Exp RELOP Exp{	table.checkValidNumeric($1->str, $3->str);
-					$$=new cut_type();
-					$$->str = "BOOL";}
+					$$ = comp.handle_relop_equalop($1, $2->str, $3);
+					}
 	|Exp EQUALOP Exp{table.checkValidNumeric($1->str, $3->str);
-					$$=new cut_type();
-					$$->str = "BOOL";}
-    //|LPAREN Type RPAREN Exp{}
+					$$ = comp.handle_relop_equalop($1,$2->str, $3);
+					}
+    /*|LPAREN Type RPAREN Exp{} was only at hw2*/
 ;
-CaseList :  CaseDeal CaseList{}
-            |CaseDeal{}
-            |DEFAULT COLON Statements{}
+/* SWITCH LPAREN Exp{table.isIntByte($3->str);} RPAREN LBRACE{table.openScope(false,true);} CaseList RBRACE{table.closeScope(true);} */
+
+CaseList :  CaseDeal CaseList{
+
+
+			$$ = comp.handle_caselist($1, $2);}
+            |CaseDeal{
+
+			$$ = comp.handle_caselist_one($1);}
+            |DEFAULT COLON Statements{$$ = comp.handle_default_case($3); }
 ;
-CaseDeal : CASE NUM COLON Statements{}
+CaseDeal : CASE NUMCASE COLON Statements{
+	
+	$$ = comp.handle_casedeal($2, $4);
+	
+	}
 ;
+NUMCASE : NUM{
+	
+	/*compilation Num + 0*/
+	
+		cut_type t_num = cut_type("INT",$1->str);
+		cut_type t0 = cut_type("INT","0");
+		$$ = comp.expBin(t_num, "add", t0);
+		
+		$$->str = "INT";
+		
+		
+}
 
 %%
 /* c code */

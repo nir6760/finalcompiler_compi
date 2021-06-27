@@ -323,15 +323,13 @@ CaseDeal : CASE NUMCASE COLON Statements{
 ;
 NUMCASE : NUM{
 	
-	/*compilation Num + 0*/
+		/*compilation Num + 0*/
 	
 		cut_type t_num = cut_type("INT",$1->str);
 		cut_type t0 = cut_type("INT","0");
 		$$ = comp.expBin(t_num, "add", t0);
 		
-		$$->str = "INT";
-		
-		
+		$$->str = "INT";		
 }
 
 %%

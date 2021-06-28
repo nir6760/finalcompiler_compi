@@ -5,12 +5,10 @@
 
 class Comp {
     private:
-    CodeBuffer& buffer;
-    SymbolTable& table;
+    CodeBuffer& code_bp;
+    SymbolTable& sym_table;
     int count_regs = 0;
     int count_str = 0;
-    //props * emitBinopLine(props& reg1, const std::string& op, props& reg2);
-    //int stringCounter;
 
     public:
     Comp(SymbolTable& t);
@@ -27,8 +25,8 @@ class Comp {
     string getRegForVar(cut_type& r1);
     cut_type * handle_str(string str);
     cut_type* handle_id(cut_type* id);
-    cut_type* expBin(cut_type& r1, const string& op, cut_type& r2);
-    void checkZeroDiv(const string& r);
+    cut_type* exp_binop(cut_type& r1, const string& op, cut_type& r2);
+    void check_div_by_zero(const string& r);
     cut_type* handle_ass(string &id, cut_type* property);
     cut_type* handle_call(string & id, vector<cut_type*> curr_call_exps);
     void closingExp(cut_type* property);
@@ -54,12 +52,7 @@ class Comp {
     cut_type* handle_default_case(cut_type* def);
     cut_type* handle_switch(cut_type* exp, cut_type* caselist, cut_type* switch_breaks);
 
-    // props * handleWhile(props* exp, props* statement, vector<pair<int,BranchLabelIndex>>& next_list);
-    // props * handleContinue(props* exp);
-    // props * handleBreak(vector<pair<int,BranchLabelIndex>>& next_list);
     
-
-
 
 };
 #endif

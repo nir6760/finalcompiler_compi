@@ -98,7 +98,7 @@ void SymbolTable::InitPrintFunctions() {
 void SymbolTable::checkWasMain() { 
 	if (!was_main) {
 		errorMainMissing();
-		delete this_func;
+		//delete this_func;
 		exit(1);
 	}
 }

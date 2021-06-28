@@ -17,11 +17,10 @@
 	int yyerror(const char * message);
 	extern size_t yyleng;
 
-	static SymbolTable table; //save the symbol table with the hash
-	// static StackScopes stack_scope;
-	// static SymbolHash symbol_table_hash;
+	static SymbolTable sym_table; //save the symbol sym_table 
 
-    static Comp comp(table); //class for tranlation to llvm
+
+    static Comp comp(sym_table); //class for tranlation to llvm
 
 	static vector<cut_type*> curr_call_exps;
 	static vector<cut_type*> nested_while;
@@ -48,21 +47,21 @@
 
 %%
 
-Program : Funcs ENDOFFILE{table.checkWasMain();}
+Program : Funcs ENDOFFILE{sym_table.checkWasMain();}
 ;
 Funcs :  FuncDecl Funcs{}
 		| {}
 ;
 FuncDecl : FuncDeclBegin Statements RBRACE{
 	
-						table.closeScope(true);
+						sym_table.closeScope(true);
 						/*comp.handle_one_statment($2); */
 						comp.end_func($1 ,$2);
 						
 						}
 ;
 FuncDeclBegin : RetType ID LPAREN Formals RPAREN LBRACE{
-	table.addFunc($2->str, $1->str, $4->params_type, $4->params_names );
+	sym_table.addFunc($2->str, $1->str, $4->params_type, $4->params_names );
 	$$ = comp.handle_func($1->str, $2->str, $4->params_type, $4->params_names);
 	}
 
@@ -80,9 +79,9 @@ Formals :   FormalList{$$=new cut_type();
 ;
 FormalList : FormalDecl COMMA FormalList{$$=new cut_type();
 				$$->params_type = $1->params_type;
-				table.mergeVectors($$->params_type,$3->params_type );
+				sym_table.mergeVectors($$->params_type,$3->params_type );
              	$$->params_names = $1->params_names;
-				table.mergeVectors($$->params_names,$3->params_names );}
+				sym_table.mergeVectors($$->params_names,$3->params_names );}
 			|FormalDecl{$$=new cut_type();
 						$$->params_type = $1->params_type; 
 						$$->params_names = $1->params_names;}
@@ -103,32 +102,32 @@ Statements :	Statements Statement{
 ;
 Statement : LBRACE OPENTHIS Statements RBRACE CLOSETHIS {$$=$3;}
 			|Type ID ASSIGN Exp SC{
-								 table.insertVarToSymbolTable($2->str, $1->str);
-								 table.checkValidTypes($1->str, $4->str);
-								 table.checkValidCast($1->str, $4->str);
+								 sym_table.insertVarToSymbolTable($2->str, $1->str);
+								 sym_table.checkValidTypes($1->str, $4->str);
+								 sym_table.checkValidCast($1->str, $4->str);
 								 $$ = comp.handle_decl($1, $2->str, $4);
 								 }
             |Type ID SC{
-				table.insertVarToSymbolTable($2->str, $1->str);
+				sym_table.insertVarToSymbolTable($2->str, $1->str);
 				$$ = comp.handle_decl($1, $2->str, nullptr);}
             |ID ASSIGN Exp SC{
 				
-				table.checkValidID($1->str);
+				sym_table.checkValidID($1->str);
 				 
 				string id_name = $1->str;
 				
-				$1->str = table.typeOfSym($1->str);
+				$1->str = sym_table.typeOfSym($1->str);
 				
 			
 				
-				table.checkValidTypes($1->str, $3->str);
+				sym_table.checkValidTypes($1->str, $3->str);
 				$$ = comp.handle_ass(id_name, $3);
 				}
             |Call SC{$$=$1;}
-            |RETURN Exp SC{table.checkRetType($2->str);
+            |RETURN Exp SC{sym_table.checkRetType($2->str);
 							$$ = comp.handle_return($2);
 							}
-			|RETURN SC{table.checkVoidRetType();
+			|RETURN SC{sym_table.checkVoidRetType();
 						$$ = comp.handle_return(nullptr);
 						}
 
@@ -138,11 +137,11 @@ Statement : LBRACE OPENTHIS Statements RBRACE CLOSETHIS {$$=$3;}
 				}
 			|IF LPAREN MExp RPAREN MStatement ELSE OPENTHIS Statement
 						{
-						table.closeScope(true);
+						sym_table.closeScope(true);
 						$$ = comp.handle_if_else($3, $5,$8);
 						}
             |WHILE LPAREN WHILECHECKEXP RPAREN WHILEOPENSCOPE Statement{
-				table.closeScope(true);
+				sym_table.closeScope(true);
 				
 				$$ = comp.handle_while($3, $6, nested_break.back());
 				nested_while.pop_back();
@@ -150,71 +149,71 @@ Statement : LBRACE OPENTHIS Statements RBRACE CLOSETHIS {$$=$3;}
 				}
             |BREAK SC{
 				
-				table.checkUnexpected("BREAK");
+				sym_table.checkUnexpected("BREAK");
 				
 				$$ = comp.handle_break(nested_break.back());
 				
 			}
             |CONTINUE SC{
-				table.checkUnexpected("CONTINUE");
+				sym_table.checkUnexpected("CONTINUE");
 				$$ = comp.handle_continue(nested_while.back());
 				}
 
             |SWITCH LPAREN SwitchExp RPAREN LBRACE SwitchOpen CaseList RBRACE{
 				
-				table.closeScope(true);
+				sym_table.closeScope(true);
 				$$ = comp.handle_switch($3, $7, nested_break.back());
 				nested_break.pop_back();
 			}
 ;
 
 SwitchExp	:	Exp{
-	table.isIntByte($1->str); 
+	sym_table.isIntByte($1->str); 
 	$$=$1;
 	nested_break.push_back(new cut_type());
 }
 ;
-SwitchOpen :	{table.openScope(false,true);}
+SwitchOpen :	{sym_table.openScope(false,true);}
 ;
-OPENTHIS	:	{table.openScope(false,false);}
+OPENTHIS	:	{sym_table.openScope(false,false);}
 ;
-CLOSETHIS	:	{table.closeScope(true);}
+CLOSETHIS	:	{sym_table.closeScope(true);}
 ;
 WHILECHECKEXP	:	Exp{
-		table.isBool($1->str);
+		sym_table.isBool($1->str);
 		nested_while.push_back($1);
 		nested_break.push_back(new cut_type());
 		$$ = $1;
 		}
 ;
-WHILEOPENSCOPE	:	{table.openScope(true,false);}
+WHILEOPENSCOPE	:	{sym_table.openScope(true,false);}
 ;
-MExp : 	Exp{table.isBool($1->str);table.openScope(false,false);
+MExp : 	Exp{sym_table.isBool($1->str);sym_table.openScope(false,false);
 			$$ = $1;}
 ;
-MStatement : 	Statement{table.closeScope(true);
+MStatement : 	Statement{sym_table.closeScope(true);
 						$$=$1;}
 ;
 Call :  ID LPAREN ExpList RPAREN{
 									
-									table.checkFuncDecl($1->str, $3->params_names);
+									sym_table.checkFuncDecl($1->str, $3->params_names);
 									
 									$$=new cut_type();
-									$$->str = table.typeOfSym($1->str);
+									$$->str = sym_table.typeOfSym($1->str);
 									$$ = comp.handle_call($1->str, curr_call_exps);
 
 									curr_call_exps={};
 									}
-        |ID LPAREN RPAREN{	table.checkFuncDecl($1->str, vector<string>());
+        |ID LPAREN RPAREN{	sym_table.checkFuncDecl($1->str, vector<string>());
 							$$=new cut_type();
-							$$->str =table.typeOfSym($1->str);
+							$$->str =sym_table.typeOfSym($1->str);
 							$$ = comp.handle_call($1->str, curr_call_exps);
 							curr_call_exps = {};
 							 }
 ;
 ExpList : 	Exp COMMA ExpList{
 							$$=new cut_type();$$->params_names = {$1->str};
-							 table.mergeVectors($$->params_names,$3->params_names );
+							 sym_table.mergeVectors($$->params_names,$3->params_names );
 							 curr_call_exps.push_back($1);
 							 
     								
@@ -233,40 +232,40 @@ Type : INT{$$ = $1;}
 ;
 Exp : LPAREN Exp RPAREN{$$ = $2; 
 					/*only cast from byte to int allowed*/}
-    |Exp MULT Exp{table.checkValidNumeric($1->str, $3->str);
+    |Exp MULT Exp{sym_table.checkValidNumeric($1->str, $3->str);
 					$$=new cut_type();
-				  $$->str =table.findExpType($1->str, $3->str);
-				  $$ = comp.expBin(*$1, "mul", *$3); }
-	|Exp DIV Exp{table.checkValidNumeric($1->str, $3->str);
+				  $$->str =sym_table.findExpType($1->str, $3->str);
+				  $$ = comp.exp_binop(*$1, "mul", *$3); }
+	|Exp DIV Exp{sym_table.checkValidNumeric($1->str, $3->str);
 				$$=new cut_type();
-				  $$->str =table.findExpType($1->str, $3->str);
-				  $$ = comp.expBin(*$1, "sdiv", *$3); }
-	|Exp MINUS Exp{table.checkValidNumeric($1->str, $3->str);
+				  $$->str =sym_table.findExpType($1->str, $3->str);
+				  $$ = comp.exp_binop(*$1, "sdiv", *$3); }
+	|Exp MINUS Exp{sym_table.checkValidNumeric($1->str, $3->str);
 				  $$=new cut_type();
-				  $$->str =table.findExpType($1->str, $3->str);
-				  $$ = comp.expBin(*$1, "sub", *$3);
+				  $$->str =sym_table.findExpType($1->str, $3->str);
+				  $$ = comp.exp_binop(*$1, "sub", *$3);
 				  }
-	|Exp PLUS Exp{table.checkValidNumeric($1->str, $3->str);
+	|Exp PLUS Exp{sym_table.checkValidNumeric($1->str, $3->str);
 				$$=new cut_type();
-				  $$->str =table.findExpType($1->str, $3->str);
-				  $$ = comp.expBin(*$1, "add", *$3); }
+				  $$->str =sym_table.findExpType($1->str, $3->str);
+				  $$ = comp.exp_binop(*$1, "add", *$3); }
 
-    |ID{table.checkValidID($1->str);
+    |ID{sym_table.checkValidID($1->str);
 		$$=new cut_type();
-		$$->str = table.typeOfSym($1->str);
+		$$->str = sym_table.typeOfSym($1->str);
 		
 		$$ = comp.handle_id($1);
 
 		}
     |Call{$$ = $1;}
 	|NUM B{
-			table.checkOverFlowByte(atoi($1->str.c_str()));
+			sym_table.checkOverFlowByte(atoi($1->str.c_str()));
 	 		
 
 			/*compilation NumB + 0*/
 			cut_type t_num = cut_type("BYTE",$1->str);
 			cut_type t0 = cut_type("BYTE","0");
-			$$ = comp.expBin(t_num, "add", t0);
+			$$ = comp.exp_binop(t_num, "add", t0);
 			$$->str = "BYTE";
 			}
     |NUM{
@@ -275,7 +274,7 @@ Exp : LPAREN Exp RPAREN{$$ = $2;
 		
 		cut_type t_num = cut_type("INT",$1->str);
 		cut_type t0 = cut_type("INT","0");
-		$$ = comp.expBin(t_num, "add", t0);
+		$$ = comp.exp_binop(t_num, "add", t0);
 		$$->str = "INT";
 		
 
@@ -285,27 +284,27 @@ Exp : LPAREN Exp RPAREN{$$ = $2;
 	}
     |TRUE{$$ = comp.bool_val(1);}
     |FALSE{$$ = comp.bool_val(0);}
-    |NOT Exp{table.isBool($2->str);
+    |NOT Exp{sym_table.isBool($2->str);
 			 $$ = comp.handle_not($2);
 			 }
 
-    |Exp AND Exp{table.isBool($1->str);
-				table.isBool($3->str);
+    |Exp AND Exp{sym_table.isBool($1->str);
+				sym_table.isBool($3->str);
 				$$ = comp.handle_and($1, $3);
 				}
-    |Exp OR Exp{table.isBool($1->str);
-				table.isBool($3->str);
+    |Exp OR Exp{sym_table.isBool($1->str);
+				sym_table.isBool($3->str);
 				$$ = comp.handle_or($1, $3);
 				}
-    |Exp RELOP Exp{	table.checkValidNumeric($1->str, $3->str);
+    |Exp RELOP Exp{	sym_table.checkValidNumeric($1->str, $3->str);
 					$$ = comp.handle_relop_equalop($1, $2->str, $3);
 					}
-	|Exp EQUALOP Exp{table.checkValidNumeric($1->str, $3->str);
+	|Exp EQUALOP Exp{sym_table.checkValidNumeric($1->str, $3->str);
 					$$ = comp.handle_relop_equalop($1,$2->str, $3);
 					}
     /*|LPAREN Type RPAREN Exp{} was only at hw2*/
 ;
-/* SWITCH LPAREN Exp{table.isIntByte($3->str);} RPAREN LBRACE{table.openScope(false,true);} CaseList RBRACE{table.closeScope(true);} */
+/* SWITCH LPAREN Exp{sym_table.isIntByte($3->str);} RPAREN LBRACE{sym_table.openScope(false,true);} CaseList RBRACE{sym_table.closeScope(true);} */
 
 CaseList :  CaseDeal CaseList{
 
@@ -333,7 +332,7 @@ int main()
 	//yydebug = 1;
 	//InitPrintFunctions();
 	int fin = yyparse();
-	table.endComp();
+	sym_table.endComp();
 	CodeBuffer::instance().printGlobalBuffer();
 	CodeBuffer::instance().printCodeBuffer();
 	return fin;
